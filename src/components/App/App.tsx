@@ -1,18 +1,14 @@
 
 import { useState } from 'react';
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
-import { useDebouncedCallback } from 'use-debounce';
 
 import {
-  fetchNotes,
-  createNote,
-  deleteNote,
-  type CreateNoteData,
-} from '../../services/noteService';
+  useQuery,
+  keepPreviousData,
+} from '@tanstack/react-query';
+
+import { useDebouncedCallback } from 'use-debounce';
+
+import { fetchNotes } from '../../services/noteService';
 
 import NoteList from '../NoteList/NoteList';
 import SearchBox from '../SearchBox/SearchBox';
@@ -23,18 +19,9 @@ import NoteForm from '../NoteForm/NoteForm';
 import css from './App.module.css';
 
 export default function App() {
-  const queryClient = useQueryClient();
-
-  // Поисковая строка в поле ввода
   const [searchText, setSearchText] = useState('');
-
-  // Поисковая строка, которая отправляется на сервер
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Текущая страница
   const [page, setPage] = useState(1);
-
-  // Состояние модального окна
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Отложенный поиск
@@ -54,44 +41,13 @@ export default function App() {
   } = useQuery({
     queryKey: ['notes', searchQuery, page],
     queryFn: () => fetchNotes(searchQuery, page),
+    placeholderData: keepPreviousData,
   });
 
-  // Создание заметки
-  const createMutation = useMutation({
-    mutationFn: createNote,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['notes'],
-      });
-
-      setIsModalOpen(false);
-    },
-  });
-
-  // Удаление заметки
-  const deleteMutation = useMutation({
-    mutationFn: deleteNote,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['notes'],
-      });
-    },
-  });
-
-  // Обработка изменения поиска
+  // Обработка поиска
   const handleSearchChange = (value: string) => {
     setSearchText(value);
     debouncedSearch(value);
-  };
-
-  // Создание заметки
-  const handleCreateNote = async (newNote: CreateNoteData) => {
-    await createMutation.mutateAsync(newNote);
-  };
-
-  // Удаление заметки
-  const handleDeleteNote = (id: string) => {
-    deleteMutation.mutate(id);
   };
 
   const notes = data?.notes ?? [];
@@ -131,28 +87,16 @@ export default function App() {
         )}
 
         {!isLoading && !isError && notes.length > 0 && (
-          <NoteList
-            notes={notes}
-            onDelete={handleDeleteNote}
-          />
-        )}
-
-        {deleteMutation.isError && (
-          <p>Could not delete note.</p>
+          <NoteList notes={notes} />
         )}
       </main>
 
       {isModalOpen && (
         <Modal onClose={() => setIsModalOpen(false)}>
           <NoteForm
-            onSubmit={handleCreateNote}
             onCancel={() => setIsModalOpen(false)}
           />
         </Modal>
-      )}
-
-      {createMutation.isError && (
-        <p>Could not create note.</p>
       )}
     </div>
   );
